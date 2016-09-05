@@ -25,6 +25,7 @@
 ![RunLoop结构图](/runLoop.png)
 #### 虽然runloop包含了五个类，但是公开的类只有图中的三个。
 - CFRunLoopSourceRef类
+
 #### CFRunLoopSourceRef是事件源（输入源），比如外部的触摸，点击事件和系统内部进程间的通信等。
 #### 按照官方文档，Source的分类
 1. Port-Based Sources
