@@ -135,7 +135,9 @@ dispatch_resume(self.timer);
 ### 图片下载
 ####由于图片渲染到屏幕需要消耗较多资源，为了提高用户体验，当用户滚动tableview的时候，只在后台下载图片，但是不显示图片，当用户停下来的时候才显示图片。
 #### 实现代码
+
 <pre><code> 
+
 - (void)viewDidLoad { 
 [super viewDidLoad];
  self.thread = [[XMGThread alloc] initWithTarget:self selector:@selector(run) object:nil][self.thread start]; 
@@ -146,6 +148,7 @@ dispatch_resume(self.timer);
 
 - (void)useImageView { 
 // 只在NSDefaultRunLoopMode模式下显示图片 [self.imageView performSelector:@selector(setImage:) withObject:[UIImage imageNamed:@"placeholder"] afterDelay:3.0 inModes:@[NSDefaultRunLoopMode]]; }
+
 </pre></code>
 
 #### 分析
