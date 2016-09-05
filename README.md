@@ -35,7 +35,9 @@
 #### 按照函数调用栈，Source的分类：
 1. Source0：非基于Port的。只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 CFRunLoopSourceSignal(source)，将这个 Source 标记为待处理，然后手动调用 CFRunLoopWakeUp(runloop) 来唤醒 RunLoop，让其处理这个事件。
 2. Source1：基于Port的，通过内核和其他线程通信，接收、分发系统事件。这种 Source 能主动唤醒 RunLoop 的线程。后面讲到的创建常驻线程就是在线程中添加一个NSport来实现的。
+
 - CFRunLoopTimerRef
+
 1. CFRunLoopTimerRef是基于时间的触发器
 2. CFRunLoopTimerRef基本上说的就是NSTimer 它受RunLoop的Mode影响
 3. GCD的定时器不受RunLoop的Mode影响
@@ -54,7 +56,9 @@ kCFRunLoopAllActivities = 0x0FFFFFFU, // 包含上面所有状态
 };
 </code></pre>
 
+
 - CFRunLoopModeRef
+
 #### 从图上可以看出每一个RunLoop包含多个mode 每一个mode 都是相互独立的，而且RunLoop 只能选择运行一个mode,也就是currentModel。如果需要切换 Mode，只能退出 Loop，再重新指定一个 Mode 进入。这样做主要是为了分隔开不同组的 Source/Timer/Observer，让其互不影响。
 
 ####系统默认注册了5个Mode:
