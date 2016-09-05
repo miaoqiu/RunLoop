@@ -32,16 +32,16 @@
 2. Custom Input Sources
 3. Cocoa Perform Selector Sources
 
-### 按照函数调用栈，Source的分类：
+#### 按照函数调用栈，Source的分类：
 1. Source0：非基于Port的。只包含了一个回调（函数指针），它并不能主动触发事件。使用时，你需要先调用 CFRunLoopSourceSignal(source)，将这个 Source 标记为待处理，然后手动调用 CFRunLoopWakeUp(runloop) 来唤醒 RunLoop，让其处理这个事件。
 2. Source1：基于Port的，通过内核和其他线程通信，接收、分发系统事件。这种 Source 能主动唤醒 RunLoop 的线程。后面讲到的创建常驻线程就是在线程中添加一个NSport来实现的。
-
 - CFRunLoopTimerRef
 1. CFRunLoopTimerRef是基于时间的触发器
 2. CFRunLoopTimerRef基本上说的就是NSTimer 它受RunLoop的Mode影响
 3. GCD的定时器不受RunLoop的Mode影响
 
 - CFRunLoopObserverRef
+
 #### 每个 Observer 都包含了一个回调（函数指针），当 RunLoop 的状态发生变化时，观察者就能通过回调接受到这个变化。可以观测的时间点有以下几个
 <pre><code>typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity)
 { kCFRunLoopEntry = (1UL << 0), // 即将进入Loop （1）
