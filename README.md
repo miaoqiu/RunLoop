@@ -95,5 +95,74 @@ kCFRunLoopAllActivities = 0x0FFFFFFU, // 包含上面所有状态
 #### CADisplayLink 是一个和屏幕刷新率一致的定时器（但实际实现原理更复杂，和 NSTimer 并不一样，其内部实际是操作了一个 Source）。如果在两次屏幕刷新之间执行了一个长任务，那其中就会有一帧被跳过去（和 NSTimer 相似），造成界面卡顿的感觉。在快速滑动TableView时，即使一帧的卡顿也会让用户有所察觉。Facebook 开源的 AsyncDisplayLink 就是为了解决界面卡顿的问题，其内部也用到了 RunLoop
 
 
+# RunLoop 实践
+### 滚动scrollview导致定时器失效
+#### 产生的原因：因为当你滚动textview的时候，runloop会进入UITrackingRunLoopMode 模式，而定时器运行在defaultMode下面，系统一次只能处理一种模式的runloop，所以导致defaultMode下的定时器失效。
+#### 解决办法1：把定时器的runloop的model改为NSRunLoopCommonModes 模式，这个模式是一种占位mode，并不是真正可以运行的mode，它是用来标记一个mode的。默认情况下default和tracking这两种mode 都会被标记上NSRunLoopCommonModes 标签。
 
+####改变定时器的mode为commonmodel，可以让定时器运行在defaultMode和trackingModel两种模式下，不会出现滚动scrollview导致定时器失效的故障
 
+####[[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+
+#### 解决办法2： 使用GCD创建定时器，GCD创建的定时器不会受runloop的影响
+<pre><code>
+// 获得队列
+dispatch_queue_t queue = dispatch_get_main_queue();
+
+// 创建一个定时器(dispatch_source_t本质还是个OC对象)
+self.timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+
+// 设置定时器的各种属性（几时开始任务，每隔多长时间执行一次）
+// GCD的时间参数，一般是纳秒（1秒 == 10的9次方纳秒）
+// 比当前时间晚1秒开始执行
+dispatch_time_t start = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC));
+
+//每隔一秒执行一次
+uint64_t interval = (uint64_t)(1.0 * NSEC_PER_SEC);
+dispatch_source_set_timer(self.timer, start, interval, 0);
+
+// 设置回调
+dispatch_source_set_event_handler(self.timer, ^{
+NSLog(@"------------%@", [NSThread currentThread]);
+
+});
+
+// 启动定时器
+dispatch_resume(self.timer);
+
+</code></pre>
+
+### 图片下载
+####由于图片渲染到屏幕需要消耗较多资源，为了提高用户体验，当用户滚动tableview的时候，只在后台下载图片，但是不显示图片，当用户停下来的时候才显示图片。
+#### 实现代码
+<pre><code> 
+- (void)viewDidLoad { 
+[super viewDidLoad];
+ self.thread = [[XMGThread alloc] initWithTarget:self selector:@selector(run) object:nil][self.thread start]; 
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event { 
+[self performSelector:@selector(useImageView) onThread:self.thread withObject:nil waitUntilDone:NO]; }
+
+- (void)useImageView { 
+// 只在NSDefaultRunLoopMode模式下显示图片 [self.imageView performSelector:@selector(setImage:) withObject:[UIImage imageNamed:@"placeholder"] afterDelay:3.0 inModes:@[NSDefaultRunLoopMode]]; }
+</pre></code>
+
+#### 分析
+####上面的代码可以达到如下效果：用户点击屏幕，在主线程中，三秒之后显示图片，但是当用户点击屏幕之后，如果此时用户又开始滚动textview，那么就算过了三秒，图片也不会显示出来，当用户停止了滚动，才会显示图片。
+#### 这是因为限定了方法setImage只能在NSDefaultRunLoopMode 模式下使用。而滚动textview的时候，程序运行在tracking模式下面，所以方法setImage不会执行。
+
+### 常驻线程
+#### 需求
+#### 需要创建一个在后台一直存在的程序，来做一些需要频繁处理的任务。比如检测网络状态等。默认情况一个线程创建出来，运行完要做的事情，线程就会消亡。而程序启动的时候，就创建的主线程已经加入到runloop，所以主线程不会消亡。这个时候我们就需要把自己创建的线程加到runloop中来，就可以实现线程常驻后台。
+#### 实现代码 见本项目demo
+
+#### 分析
+#### 如果没有实现添加NSPort或者NSTimer，会发现执行完run方法，线程就会消亡，后续再执行touchbegan方法无效。我们必须保证线程不消亡，才可以在后台接受时间处理
+#### RunLoop 启动前内部必须要有至少一个 Timer/Observer/Source，所以在 [runLoop run] 之前先创建了一个新的 NSMachPort 添加进去了。通常情况下，调用者需要持有这个 NSMachPort (mach_port) 并在外部线程通过这个 port 发送消息到 loop 内；但此处添加 port 只是为了让 RunLoop 不至于退出，并没有用于实际的发送消息。
+#### 可以发现执行完了run方法，这个时候再点击屏幕，可以不断执行test方法，因为线程self.thread一直常驻后台，等待事件加入其中，然后执行。
+### 在所有UI相应操作之前处理任务
+#### 比如我们点击了一个按钮，在ui关联的事件开始执行之前，我们需要执行一些其他任务，可以在observer中实现
+#### 代码见本项目demo
+![btnClikc](/883F2856-D3FD-4093-84AF-00BD3C35917F.png)
+#### 可以看到在按钮点击之前，先执行的observe方法里面的代码。这样可以拦截事件，让我们的代码先UI事件之前执行。
